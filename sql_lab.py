@@ -138,3 +138,34 @@ elif level == "Level 4: The Unhackable Code (Secure)":
                 
         except Exception as e:
             st.error(f"⚠️ Database Error: {e}")
+# --- FOOTER: EDUCATIONAL EXPLANATION ---
+st.divider()
+
+with st.expander("📖 Why Level 4 is Unhackable (The Engineering Explanation)"):
+    st.markdown("""
+    ### The Difference: "Gluing" vs. "Passing" Data
+    
+    **1. The Vulnerable Way (Levels 1-3)**
+    In the first three levels, the code used **F-Strings** (String Concatenation) to build the query.
+    It "glued" your input directly into the command string.
+    
+    ```python
+    # DANGEROUS: The database cannot tell where the command ends and your input begins.
+    query = f"SELECT * FROM users WHERE name = '{user_input}'"
+    ```
+    If your input contains SQL symbols (like `'` or `--`), they break out of the "data box" and become part of the "command structure."
+
+    ---
+
+    **2. The Secure Way (Level 4)**
+    Level 4 uses **Parameterized Queries** (the `?` symbol).
+    The database receives the command template *first*, locks it, and THEN accepts the data.
+    
+    ```python
+    # SECURE: The structure is locked. Input is treated strictly as text.
+    query = "SELECT * FROM users WHERE name = ?"
+    data = (user_input,)
+    cursor.execute(query, data)
+    ```
+    Even if you type a massive attack payload like `' UNION SELECT...`, the database doesn't run it. It just looks for a user who is literally named `' UNION SELECT...`.
+    """)
