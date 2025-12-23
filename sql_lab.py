@@ -1,88 +1,80 @@
 import streamlit as st
 import sqlite3
 
-# --- 1. SETUP THE VULNERABLE DATABASE (In-Memory) ---
-# We create a fresh DB every time the script runs (Sandbox Mode)
+# --- SETUP (Same DB as before) ---
 conn = sqlite3.connect(':memory:')
 c = conn.cursor()
-
-# Create a users table
-c.execute('''
-    CREATE TABLE users (
-        id INTEGER PRIMARY KEY,
-        username TEXT,
-        password TEXT,
-        role TEXT
-    )
-''')
-
-# Insert a "Target" User
+c.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, password TEXT, role TEXT)')
 c.execute("INSERT INTO users (username, password, role) VALUES ('admin', 'super_secret_pass', 'administrator')")
-c.execute("INSERT INTO users (username, password, role) VALUES ('alice', 'alice123', 'user')")
 conn.commit()
 
-# --- 2. THE APP INTERFACE ---
-st.set_page_config(page_title="The Glass Box: SQLi Lab", page_icon="🛡️")
+st.set_page_config(page_title="SQLi Training Lab", page_icon="🛡️", layout="wide")
 
-st.title("🛡️ The Glass Box")
-st.subheader("Level 1: The Login Bypass")
-st.markdown("""
-**Mission:** Log in as the `admin` *without* knowing the password.
-<br>
-**Hint:** Look at the 'Glass Box' below. Can you trick the database into thinking the password check is True?
-""", unsafe_allow_html=True)
+# --- SIDEBAR: LEVEL SELECTOR ---
+st.sidebar.title("🎚️ Mission Select")
+level = st.sidebar.radio("Choose Difficulty:", ["Level 1: No Defense", "Level 2: The Blacklist"])
 
-col1, col2 = st.columns(2)
+st.title("🛡️ The Glass Box: SQL Injection")
 
-with col1:
-    username_input = st.text_input("Username", value="admin")
-    password_input = st.text_input("Password", type="password")
-    login_btn = st.button("Attempt Login")
+# --- LEVEL LOGIC ---
 
-# --- 3. THE GLASS BOX (Visualizing the Vulnerability) ---
-# This is the "Unsafe" way to write SQL (String Concatenation)
-# We show this to the user so they can learn.
-sql_query_string = f"SELECT * FROM users WHERE username = '{username_input}' AND password = '{password_input}'"
-
-with col2:
-    st.markdown("### 🔍 The Glass Box (Backend View)")
-    st.markdown("This is the exact command the database receives:")
+if level == "Level 1: No Defense":
+    st.subheader("Level 1: The Open Door")
+    st.info("Mission: Log in as 'admin' without the password.")
     
-    # We use a code block to show the query clearly
-    st.code(sql_query_string, language="sql")
+    col1, col2 = st.columns(2)
+    with col1:
+        username = st.text_input("Username", value="admin")
+        password = st.text_input("Password", type="password")
+        login = st.button("Login (Level 1)")
     
-    st.info("👆 Watch how this query changes as you type in the boxes.")
+    # VULNERABLE QUERY (Direct F-String)
+    query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
+    
+    with col2:
+        st.markdown("### 🔍 The Glass Box")
+        st.code(query, language="sql")
 
-st.divider()
+    if login:
+        try:
+            c.execute(query)
+            if c.fetchone():
+                st.balloons()
+                st.success("✅ HACKED! You bypassed the login.")
+            else:
+                st.error("❌ Access Denied")
+        except Exception as e:
+            st.warning(f"⚠️ SQL Error: {e}")
 
-# --- 4. EXECUTION ENGINE ---
-if login_btn:
-    try:
-        # DANGER: We are executing the raw string directly!
-        # This is what allows the hack to work.
-        c.execute(sql_query_string)
-        user = c.fetchone()
-        
-        if user:
-            # SUCCESS
-            user_id, name, pwd, role = user
-            st.success(f"🔓 ACCESS GRANTED! Welcome, {name}.")
-            st.balloons()
-            
-            st.write("---")
-            st.markdown(f"**You dumped the database row:**")
-            st.json({"id": user_id, "username": name, "role": role})
-            
-            if role == 'administrator':
-                st.success("🏆 YOU WIN! You stole the Admin session.")
-        else:
-            # FAILURE
-            st.error("🚫 ACCESS DENIED. Invalid credentials.")
-            
-    except sqlite3.OperationalError as e:
-        # SYNTAX ERROR (Happens if the user types a broken hack)
-        st.warning("⚠️ SQL SYNTAX ERROR")
-        st.error(f"The database crashed: {e}")
-        st.write("This means you 'broke' the query structure. You are close!")
 
-conn.close()
+elif level == "Level 2: The Blacklist":
+    st.subheader("Level 2: The 'Stupid' Firewall")
+    st.warning("Mission: The developer has blocked the word 'OR' and '--'. Can you still get in?")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        username = st.text_input("Username (Lvl 2)", value="admin")
+        password = st.text_input("Password (Lvl 2)", type="password")
+        login = st.button("Login (Level 2)")
+
+    # THE "DEFENSE": Removing dangerous keywords
+    # This is a bad way to secure code, but common in beginner apps.
+    clean_user = username.replace("OR", "").replace("--", "").replace("or", "")
+    
+    query = f"SELECT * FROM users WHERE username = '{clean_user}' AND password = '{password}'"
+    
+    with col2:
+        st.markdown("### 🔍 The Glass Box")
+        st.caption("Notice how your input gets 'cleaned' before the query builds.")
+        st.code(query, language="sql")
+
+    if login:
+        try:
+            c.execute(query)
+            if c.fetchone():
+                st.balloons()
+                st.success("🏆 MASTER HACKER! You beat the filter.")
+            else:
+                st.error("❌ Access Denied")
+        except Exception as e:
+            st.warning(f"⚠️ SQL Error: {e}")
